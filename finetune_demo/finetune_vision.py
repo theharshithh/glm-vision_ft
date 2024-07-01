@@ -190,7 +190,7 @@ def _load_datasets(
         data_files: dict[NamedSplit, str],
         num_proc: Optional[int],
 ) -> DatasetDict:
-    if data_format == '.jsonl':
+    if data_format == '.json':
         dataset_dct = load_dataset(
             data_dir,
             data_files=data_files,
