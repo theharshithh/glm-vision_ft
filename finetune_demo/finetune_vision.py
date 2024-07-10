@@ -28,6 +28,7 @@ from transformers import Seq2SeqTrainer as _Seq2SeqTrainer
 from datasets import load_dataset, DatasetDict, NamedSplit
 from typing import Optional
 from PIL import Image
+from typing import Dict, List, Tuple
 
 app = typer.Typer(pretty_exceptions_show_locals=False)
 
@@ -57,6 +58,33 @@ class DataCollatorForSeq2Seq(_DataCollatorForSeq2Seq):
 
 
 class Seq2SeqTrainer(_Seq2SeqTrainer):
+    # def __init__(
+    #     self,
+    #     model: Union["PreTrainedModel", nn.Module] = None,
+    #     args: "TrainingArguments" = None,
+    #     data_collator: Optional["DataCollator"] = None,
+    #     train_dataset: Optional[Dataset] = None,
+    #     eval_dataset: Optional[Union[Dataset, Dict[str, Dataset]]] = None,
+    #     tokenizer: Optional["PreTrainedTokenizerBase"] = None,
+    #     model_init: Optional[Callable[[], "PreTrainedModel"]] = None,
+    #     compute_metrics: Optional[Callable[["EvalPrediction"], Dict]] = None,
+    #     callbacks: Optional[List["TrainerCallback"]] = None,
+    #     optimizers: Tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
+    #     preprocess_logits_for_metrics: Optional[Callable[[torch.Tensor, torch.Tensor], torch.Tensor]] = None,
+    # ):
+    #     # print(f'argss -->> {args}')
+    #     super().__init__(
+    #         model=model,
+    #         args=args,
+    #         data_collator= data_collator,
+    #         train_dataset= train_dataset,
+    #         tokenizer=tokenizer,
+    #         model_init=model_init,
+    #         compute_metrics=compute_metrics,
+    #         callbacks=callbacks,
+    #         optimizers=optimizers,
+    #         preprocess_logits_for_metrics=preprocess_logits_for_metrics
+    #     )
     # Not Support for apex
     def training_step(self, model: nn.Module, inputs: dict[str, Any]) -> torch.Tensor:
 
@@ -190,7 +218,7 @@ def _load_datasets(
         data_files: dict[NamedSplit, str],
         num_proc: Optional[int],
 ) -> DatasetDict:
-    if data_format == '.json':
+    if data_format == '.jsonl':
         dataset_dct = load_dataset(
             data_dir,
             data_files=data_files,
@@ -226,7 +254,6 @@ class DataManager(object):
         orig_dataset = self._get_dataset(split)
         if orig_dataset is None:
             return
-
         if remove_orig_columns:
             remove_columns = orig_dataset.column_names
         else:
@@ -236,6 +263,10 @@ class DataManager(object):
             batched=batched,
             remove_columns=remove_columns,
             num_proc=self._num_proc,
+            # This is default params of  orig_dataset.map, and you can change it smaller
+            # https://github.com/THUDM/GLM-4/issues/277
+            writer_batch_size=500,
+            batch_size=500,
         )
 
 
@@ -271,7 +302,7 @@ def process_batch(
                 [message],
                 tokenize=True,
                 return_dict=True,
-                padding=True,
+                padding=True
             )
             new_input_ids = new_input_ids_all['input_ids'][0][2:]
             new_attention_mask = new_input_ids_all['attention_mask'][0][2:]
@@ -453,6 +484,7 @@ def main(
         batched=True,
     )
     print('train_dataset:', train_dataset)
+
     val_dataset = data_manager.get_dataset(
         Split.VALIDATION,
         functools.partial(
@@ -463,6 +495,7 @@ def main(
         ),
         batched=True,
     )
+
     if val_dataset is not None:
         print('val_dataset:', val_dataset)
     test_dataset = data_manager.get_dataset(
@@ -526,7 +559,7 @@ def main(
             else:
                 print(auto_resume_from_checkpoint,
                       "The specified checkpoint sn(" + auto_resume_from_checkpoint + ") has not been saved. Please search for the correct checkpoint in the model output directory")
-
+    print('hitting test')
     if test_dataset is not None:
         trainer.predict(test_dataset)
 
